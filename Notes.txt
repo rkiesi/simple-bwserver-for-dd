@@ -1,0 +1,362 @@
+TIBCO BWCE Monitoring unsing Datadog Cloud Services
+---------------------------------------------------
+
+1) Create Datadog test account (free trial)
+ a) downgrade to free tier
+    ...
+ b) Datadog DD Agent must be hosted and configured
+    - Datadog access key....
+ c) Running DD Agent as Docker container
+    https://app.datadoghq.eu/: Integrations -> Agent -> Docker
+ d) login to Datadog
+   - https://app.datadoghq.eu/
+   --> Dashboards - should show metrics collected by dd-agent running on Docker container within virtual server
+       show data for all running containers (dd-agent, flogo-webui, registry)
+	   [similar: Infrastructure -> Containers]
+	   
+Commands:
+---------
+docker run -d \
+ --name dd-agent \
+ -v /var/run/docker.sock:/var/run/docker.sock:ro \
+ -v /proc/:/host/proc/:ro \
+ -v /opt/datadog-agent/run:/opt/datadog-agent/run:rw \
+ -v /sys/fs/cgroup/:/host/sys/fs/cgroup:ro \
+ -p 8125:8126/udp \
+ -p 8126:8126/tcp \
+ -e DD_API_KEY=1a3c3202a8ac87037ac9d7c4ef763571 \
+ -e DD_SITE="datadoghq.eu" \
+ -e DD_LOGS_ENABLED=true \
+ -e DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true \
+ gcr.io/datadoghq/agent:7
+
+OR
+docker ps -a
+docker start dd-agent
+
+-> enable DD-Agent read only access on docker deamon to see all running containers and grep metadata for those
+-> enable DD-Agent read only access on local system and process data
+-> use private account Datadog account key
+-> Datadog cloud environment endpoint to use
+-> run Datadog prepared container (newest release - here DD-Agent v7)
+
+
+2) Simpple Java Application to test connectivity from JVM instrumentation via DD-Agent to Datadog
+  - The Java SDK provides a built-in HTTP server (class: HttpServer - itbelongs to the package com.sun.net). [tests were done with Java 11]
+  -> Article on first simple steps using HttpServer: [Java - HttpServer Example](https://www.logicbig.com/tutorials/core-java-tutorial/http-server/http-server-basic.html), last visited 24.10.2022
+     Use BasicHttpServerExample2
+  -> for more details: [Configuring the Java Tracing Library](https://docs.datadoghq.com/tracing/trace_collection/library_config/java/), last visited 24.10.2022
+  -> Article: [Setting Up Monitoring For Java With Datadog](https://mincong.io/en/setting-up-monitoring-for-java-with-datadog/), last visited 24.10.2022
+  
+Commands:
+---------
+# create sample
+mkdir BasicHttpServerExample2
+cd BasicHttpServerExample2
+mkdir -p com/logicbig/example
+
+javac --version
+javac BasicHttpServerExample2.java
+mv BasicHttpServerExample2.class com/logicbig/example/
+
+java -cp ${PWD} com.logicbig.example.BasicHttpServerExample2
+
+# Tesing:
+curl -X GET -H "Accept: text/html,application/xhtml+xml,application/xml;" --url http://localhost:8500/example?sample=test
+
+# Response
+This is the response at /example?sample=test && echo
+
+# Logs
+-- headers --
+Accept=[text/html,application/xhtml+xml,application/xml;]
+Host=[localhost:8500]
+User-agent=[curl/7.68.0]
+-- principle --
+null
+-- HTTP method --
+GET
+-- query --
+sample=test
+
+
+3) Instrumentation of JVM for Datadog
+ - the datadog instrumentation library must be added to the JVM
+ - Communication must go to the DD-Agent running within Docker container
+
+ -> [Tracing Java Applications](https://docs.datadoghq.com/tracing/trace_collection/dd_libraries/java/?tab=containers)
+
+For intstrumentation the JVM needs to know what Datadog library to load and how to connect to a DD-Agend to hand over collected metrics.
+
+export DD_TRACE_AGENT_URL=localhost:8126
+
+wget -O dd-java-agent.jar https://dtdg.co/latest-java-tracer
+
+export DD_TRACE_AGENT_URL=http://localhost:8126
+java -javaagent:dd-java-agent.jar \
+ -Ddd.profiling.enabled=true \
+ -XX:FlightRecorderOptions=stackdepth=256 \
+ -Ddd.logs.injection=true \
+ -Ddd.service=my-http-app \
+ -Ddd.version=1.0 \
+ -Ddd.env=staging \
+ -Ddd.trace.agent.url=$DD_TRACE_AGENT_URL \
+ BasicHttpServerExample2
+
+Constant sample calls:
+----------------------
+for i in {1..200}; \
+do \
+  curl -X GET \
+    --header "Accept: text/html,application/xhtml+xml,application/xml;" \
+    --header "X-Call-Counter: ${i}" \
+	--url http://localhost:8500/example?sample=test; \
+	echo ""; \
+	sleep "0.$(( ${RANDOM} % 10 ))"; \
+done
+
+
+--------- RUNNING THE TEST APP AS DOCKER CONTAINER ------------------------------------
+
+As we will run a JVM based application server that requires a lot of settings provided as Java system properties, application paramters as well as environment varaiables.
+The system properties are used to control the JVM behaviour for resource usage. One of the important settings is the Java heap size. Next are parameters that influence the application server inner workings and might also be used to tell an application on that platform about parameter values it should use at runtime. Those settings might be endpoints for 3rd party services or monitoring systesm. Environment variables might also be used by an application to get parametrizations.
+In context of TIBCO BW there is another option to provide application runtime settings by pointing the application engine to a parameter file suitable for a certain stage.
+
+All these options might be considered for hosting a Java application on a docker container. Let's start with a simple example.
+We need either need to decide what docker base image we like to use and install a preferred JVM on it or we might use a pre-built docker images that already provides the needed JVM. To keep it simple I have decided to use a OpenJDK 11 image for the sample. I also will start the JVM directly withing the container without any extra startup script. A quick search on DockerHub showed that the official OpenJDK images are discontinoued. A suitable replacement will be the Temurin images. For my test thoses give me basically what I want, an OpenJDK 11 base imge: [https://hub.docker.com/_/eclipse-temurin](https://hub.docker.com/_/eclipse-temurin). These images are widely used and seem to have a good reputation.
+
+-------
+FROM eclipse-temurin:11
+
+RUN mkdir -p /opt/app
+
+ADD . /opt/app
+WORKDIR /opt/app
+RUN wget -O dd-java-agent.jar https://dtdg.co/latest-java-tracer
+
+EXPOSE 8500
+
+ENV APP_NAME_ON_DD my-http-app
+ENV APP_VERSION_ON_DD 1.0
+ENV APP_ENV_ON_DD testing
+ENV DD_AGENT_URL http://192.168.49.1:8126
+
+# CMD ["java", "-jar", "/opt/app/japp.jar"]
+#CMD ["java", \
+#"-javaagent:dd-java-agent.jar", \
+#"-cp /opt/app/", \
+#"-Ddd.profiling.enabled=true", \
+#"-XX:FlightRecorderOptions=stackdepth=256", \
+#"-Ddd.logs.injection=true", \
+#"-Ddd.service=${APP_NAME_ON_DD}", \
+#"-Ddd.version=${APP_VERSION_ON_DD}", \
+#"-Ddd.env=${APP_ENV_ON_DD}", \
+#"-Ddd.trace.agent.url=${DD_AGENT_URL}", \
+#"com/logicbig/example/BasicHttpServerExample2"]
+
+# Command in shell format
+CMD java \
+-javaagent:dd-java-agent.jar \
+-cp /opt/app/ \
+-Ddd.profiling.enabled=true \
+-XX:FlightRecorderOptions=stackdepth=256 \
+-Ddd.logs.injection=true \
+-Ddd.service=${APP_NAME_ON_DD} \
+-Ddd.version=${APP_VERSION_ON_DD} \
+-Ddd.env=${APP_ENV_ON_DD} \
+-Ddd.trace.agent.url=${DD_AGENT_URL} \
+com/logicbig/example/BasicHttpServerExample2
+
+# Better would be to use Entypoint to avoid startup script beeing superseeded by a container parameter!
+
+------
+
+# COMPILE JAVA CODE
+javac 
+
+# BUILD IMAGE
+docker build --tag httpsample:1.0 .
+
+# RUN CONTAINER INTERACTIVE 
+docker run -ti \
+ -p 8500:8500/tcp \
+ -e APP_NAME_ON_DD="my-container-app" \
+ -e APP_VERSION_ON_DD="1.1" \
+ -e APP_ENV_ON_DD="testing" \
+ -e DD_AGENT_URL="http://192.168.49.1:8126" \
+ --name http-sample httpsample:1.0
+
+# RUN CONTAINER AS DEMON:
+docker run -d \
+ -p 8500:8500/tcp \
+ -e APP_NAME_ON_DD="my-container-app" \
+ -e APP_VERSION_ON_DD="1.1" \
+ -e PP_ENV_ON_DD="testing" \
+ -e DD_AGENT_URL="http://192.168.49.1:8126" \
+ --name http-sample httpsample:1.0
+
+# STOP an DELETE CONTAINER
+docker stop http-sample
+docker rm http-sample
+
+
+=================================================================================
+What needs to be adjusted for BWCE?
+=================================================================================
+
+JVM startup and parameters: (suitable for OpenJDK 11)
+Docs: [The java command[(https://docs.oracle.com/en/java/javase/13/docs/specs/man/java.html#standard-options-for-java)
+
+java -javaagent:dd-java-agent.jar \
+ -Ddd.profiling.enabled=true \
+ -XX:FlightRecorderOptions=stackdepth=256 \
+ -Ddd.logs.injection=true \
+ -Ddd.service=my-http-app \
+ -Ddd.version=1.0 \
+ -Ddd.env=staging \
+ -Ddd.trace.agent.url=$DD_TRACE_AGENT_URL \
+ -D... BW specific settings
+ -X... BW specific JVM parameters
+ BasicHttpServerExample2
+
+-javaagent:jarpath[=options]
+ +-- Loads the specified Java programming language agent. See java.lang.instrument. 
+docs: [Package java.lang.instrument](https://docs.oracle.com/javase/7/docs/api/java/lang/instrument/package-summary.html)
+Provides services that allow Java programming language agents to instrument programs running on the JVM.
+jarpath is the path to the agent JAR file. options is the agent options. This switch may be used multiple times on the same command-line, thus creating multiple agents. More than one agent may use the same jarpath.
+More info on article [Guide to Java Instrumentation](https://www.baeldung.com/java-instrumentation), last visited 24.10.2022.
+
+[Overview of Java Options](https://docs.oracle.com/en/java/javase/13/docs/specs/man/java.html#overview-of-java-options)
+[Standard Options for Java](https://docs.oracle.com/en/java/javase/13/docs/specs/man/java.html#standard-options-for-java)
+
+section: Advanced Runtime Options for Java
+-XX:FlightRecorderOptions=stackdepth=256 
+     +-- Java Flight Recorder (JFR) is a tool for collecting diagnostic and profiling data about a running Java application. It is integrated into the Java Virtual Machine (JVM) and causes almost no performance overhead, so it can be used even in heavily loaded production environments.
+
+-Dproperty=value
+  +-- Sets a system property value. The property variable is a string with no spaces that represents the name of the property. The value variable is a string that represents the value of the property.
+
+
+=====================================
+Anatomy of the JVM start for BW Node
+=====================================
+
+exec $JAVA_HOME/bin/java
+
+<adding instrumentation lib here>
+
+-XX:-HeapDumpOnOutOfMemoryError
+
+<adding instrumentation options here>
+
+$BW_JAVA_GC_OPTS
+$BW_JAVA_OPTS
+
+<adding dd-agent config options here>
+
+-Djceks.key.serialFilter="com.tibco.**;java.lang.Enum;java.security.KeyRep;java.security.KeyRep$Type;javax.crypto.spec.SecretKeySpec;!*"
+-Djava.class.path=_APPDIR_/tibco.home/bwce/2.7/system/shared/com.tibco.bw.tpcl.com.fasterxml.jackson_1.2.600.001:_APPDIR_/tibco.home/bwce/2.7/system/hotfix/lib/common:_APPDIR_/tibco.home/bwce/2.7/system/lib/common:_APPDIR_/tibco.home/bwce/2.7/system/lib/common/org.eclipse.osgi_3.15.300.v20200520-1959.jar:...:_APPDIR_/tibco.home/bwce/2.7/system/shared/com.tibco.bw.sharedresource.tcpconnection.model_6.3.2001.001.jar: 
+-Djava.library=_APPDIR_/tibco.home/tibcojre64/11/lib/server/libjvm.so
+-Dapplication.processid=124164
+-Dwrapper.tra.file=_APPDIR_/tibco.home/bwce/2.7/bin/bwappnode.tra
+com.tibco.bw.thor.admin.node.Main
+"$@"
+
+============================================================================================================
+How to use to monitor a Java based application server? -> our example: TIBCO BusinessWorks
+============================================================================================================
+
+Waht must be considered?
+- How to extend the container images for BWCE?
+- What parameters are needed for the instrumentation library?
+- How to make sure every container image will bundling the instrumentation?
+- How must parameters for the instrumentation be passed to a container instance?
+- What will be the target runtime environment? (K8s -> Application YAML file to host a REST API as service)
+
+1) Setup BWCE for runtime use with docker on local host (dev system)
+   - required: Linux (Ubuntu 20.04.01), Docker (20.10.12)
+   Docs:
+   - WEB: [Creating the TIBCO BusinessWorks Container Edition Base Docker Image for Linux Containers](https://docs.tibco.com/pub/bwce/2.7.3/doc/html/Default.htm#app-dev-guide/creating-the-bwce-ba2.htm)
+   - WEB: [Extending the Base Docker Image](https://docs.tibco.com/pub/bwce/2.7.3/doc/html/Default.htm#app-dev-guide/extending-the-base-d.htm)
+
+----------------
+BWCE BASE IMAGE:
+----------------
+2) Follow install instructions for BW Docker runtime artifacts (base image)
+
+cd <TIBCO-HOME>/bwce/2.7/docker
+cp ~/Downloads/bwce/BWCEv273/bwce-runtime-2.7.3.zip ./resources/bwce-runtime/
+docker build -t tibco/bwce:latest .
+
+--> The standard Dockerfile should be adopted to add the Datadog Java Instrumentation library
+ + option 1) downloading the DD library before buildin the base image and store it on a subdirectory to have it available later for app image building
+ + option 2) downloading the DD instrumentation library during docker image build process (requires internet connection from build server)
+ + option 3) use documented approach of creating an extended bwce base image. In that case the dd-instrumentation lib will be added to this image
+   docker build -t tibco/bwce-dd:latest . 
+
+--> Verification of the BWCE Base Image content:
+ docker image ls tibco/bwce:latest
+ docker run --rm -ti --name bwce-test tibco/bwce:latest bash    <-- requires tweaking dockerfile (CMD instead of ENTRYPOINT)!
+ 
+ ls -al /resources/instrumentation
+ -rw-r--r-- 1 root root 19222233 Oct 18 16:51 dd-java-agent.jar
+
+ more /scripts/startup.sh
+ +--> calls: /scripts/setup.sh
+ 
+ more /scripts/stetup.sh
+ +--> defines many functions used for BW node setup at startup time of a container instance!
+ 
+------------------
+Application Image
+------------------
+3) Now the BW Application must be bundled into a docker image to be able to run.
+   Any used Plugins also need to be added now to be available at applicatio startup time.
+   Docs:
+   - WEB: [Building an Application Image](https://docs.tibco.com/pub/bwce/2.7.3/doc/html/Default.htm#samples-guide/building-an-applicat.htm)
+
+==> It would be a better approach to analyze the EAR (application descriptor) for required plugins and add any of those automatically as desired.
+    Another option would be to add all plugins into the base image. During building the application image a Docker multi-stage build should be used to keep only the needed ones for the resulting application image.
+	The installer script should also run as part of the image creation to save limit the size of the resulting container image and improve startup time (only JVM must initalize)
+
+ docker build -t simple-bwserver-demo:latest .
+ docker run --rm -ti -p 8088:8088/tcp --name bwservice simple-bwserver-demo:latest
+ 
+-----------------------------------------------------
+Enhancing the BW Application Image for DD Monitoring
+-----------------------------------------------------
+4) BWCE within Container - Startup Sequence
+
+Container Startup Script:
+/scripts/start.sh
+--+-> /scripts/setup.sh   <=== copy all BW node files, unpack configs and substvar files etc.
+  |  - must be enhanced for dd-intstrumentation
+  |  - several config parameters to connect to dd-agent on another container
+  |  - XX:...
+  |  - D....
+  |  
+  +-+-> /tmp/tibco.home/bw*/*/bin/startBWAppNode.sh
+    |   /tmp/tibco.home/bwce/2.7/bin/startBWAppNode.sh
+    |	  
+    +--> /tmp/tibco.home/bw*/*/bin/bwappnode
+	     /tmp/tibco.home/bwce/2.7/bin/bwappnode
+         Line 33: startup of the JVM for BW App Node   <== here we need to add the instrumentation for Datadog
+
+Dockerfile <- building the BWCE base image        (here we add the Datadog libs to distribute it to each application)
+-> bwce-base-image/Dockerfile
+Dockerfile <- building the BWCE application image (here we configure add and configure the Datadog instrumentation library)
+-> bwce-sample-app/Dockerfile
+
+What needs to patched?
+ ==> /tmp/tibco.home/bwce/2.7/bin/bwappnode
+ Line 33:
+ 
+How to add the patch?
+option 1)
+ - unzip bwce-runtime distribution package
+ - adopt the file
+ - zip package
+ - build new base bwce image
+option 2) 
+ - add a patch script during base image creation
+ - apply the patch on file <path>/tibco.home/bwce/2.7/bin/bwappnode during base image creation process

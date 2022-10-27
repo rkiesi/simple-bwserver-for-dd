@@ -17,6 +17,7 @@ compile: *.java
 	mv *.class com/logicbig/example
 
 build: compile
+	-docker rmi $(appName):$(appVersion)
 	docker build --tag $(appName):$(appVersion) .
 	echo
 	docker image ls $(appName) > docker_image.txt

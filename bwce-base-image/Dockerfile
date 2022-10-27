@@ -5,6 +5,15 @@ LABEL maintainer="TIBCO Software Inc."
 # copy all TIBCO BWCE runtime artifacts into the image
 ADD . /
 
+# patch container start.sh to add Datadog instrumention patch
+RUN \
+if [ -f "/scripts/dd-patch-bwappnode.sh" ]; then \
+  echo "[INFO] adding Datadog Patch for BWCE node startup"; \
+  sed '/^exec bash $BWCE_HOME.*/i source \/scripts\/dd-patch-bwappnode.sh' /scripts/start.sh > /scripts/start.sh.dd; \
+  mv /scripts/start.sh /scripts/start.sh_original; \
+  mv /scripts/start.sh.dd /scripts/start.sh; \
+fi
+
 # as superuser: make all TIBCO scripts executable & update OS software packages
 RUN \
 chmod 755 /scripts/*.sh && \
