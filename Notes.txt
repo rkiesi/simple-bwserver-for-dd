@@ -141,19 +141,6 @@ ENV APP_VERSION_ON_DD 1.0
 ENV APP_ENV_ON_DD testing
 ENV DD_AGENT_URL http://192.168.49.1:8126
 
-# CMD ["java", "-jar", "/opt/app/japp.jar"]
-#CMD ["java", \
-#"-javaagent:dd-java-agent.jar", \
-#"-cp /opt/app/", \
-#"-Ddd.profiling.enabled=true", \
-#"-XX:FlightRecorderOptions=stackdepth=256", \
-#"-Ddd.logs.injection=true", \
-#"-Ddd.service=${APP_NAME_ON_DD}", \
-#"-Ddd.version=${APP_VERSION_ON_DD}", \
-#"-Ddd.env=${APP_ENV_ON_DD}", \
-#"-Ddd.trace.agent.url=${DD_AGENT_URL}", \
-#"com/logicbig/example/BasicHttpServerExample2"]
-
 # Command in shell format
 CMD java \
 -javaagent:dd-java-agent.jar \
@@ -171,34 +158,11 @@ com/logicbig/example/BasicHttpServerExample2
 
 ------
 
-# COMPILE JAVA CODE
-javac 
-
-# BUILD IMAGE
-docker build --tag httpsample:1.0 .
-
-# RUN CONTAINER INTERACTIVE 
-docker run -ti \
- -p 8500:8500/tcp \
- -e APP_NAME_ON_DD="my-container-app" \
- -e APP_VERSION_ON_DD="1.1" \
- -e APP_ENV_ON_DD="testing" \
- -e DD_AGENT_URL="http://192.168.49.1:8126" \
- --name http-sample httpsample:1.0
-
-# RUN CONTAINER AS DEMON:
-docker run -d \
- -p 8500:8500/tcp \
- -e APP_NAME_ON_DD="my-container-app" \
- -e APP_VERSION_ON_DD="1.1" \
- -e PP_ENV_ON_DD="testing" \
- -e DD_AGENT_URL="http://192.168.49.1:8126" \
- --name http-sample httpsample:1.0
-
-# STOP an DELETE CONTAINER
-docker stop http-sample
-docker rm http-sample
-
+Makefile is used to automate building and hosting the sample Java HTTP server application.
+make compile
+make build
+make run
+make clean
 
 =================================================================================
 What needs to be adjusted for BWCE?
@@ -240,6 +204,7 @@ section: Advanced Runtime Options for Java
 =====================================
 Anatomy of the JVM start for BW Node
 =====================================
+The BW node start is finally within file 'bwappnode'. The JVM command has a lot of paramters, but we need to add 'javaagent' and the dd-instrumentation library parameter values to the command in the TIBCO provided script.
 
 exec $JAVA_HOME/bin/java
 
@@ -286,6 +251,18 @@ BWCE BASE IMAGE:
 
 cd <TIBCO-HOME>/bwce/2.7/docker
 cp ~/Downloads/bwce/BWCEv273/bwce-runtime-2.7.3.zip ./resources/bwce-runtime/
+
+# additional step for DD (it will be copied into the docker base image)
+cp <source-path>/simple-bwserver-for-dd/bwce-base-image/dd-patch-bwappnode.sh  ./scripts
+# the adopted Dockerfile for the bwce base image will active the patch by running it as part of the installation process
+# patched is the container entrypoint script: /scripts/start.sh
+
+The activated patch itself will patch the BW node start (JVM hosting the BW application server) file '/tmp/tibco.home/bwce/2.7/bin/bwappnode'. It is adding JVM paramters to activate the DataDog instrumentation librabry and configures it to send metrics and traces via a locally running DataDog Agent (also container) to the DataDog cloud service endpoint.
+
+ATTENTION! The datadog metrics collector is not configured. So it will capture metrics for any Java class on the instrumented JVM. That is causinge quite some extra load. During first tests the BWCE engine startup time has doubled! For real productaion use the important elements need to be selected and configured for the DD metrics colletor to minimze its impact on resource consumption.
+
+Now, lets build the base image as described in the TIBCO BWCE docs:
+
 docker build -t tibco/bwce:latest .
 
 --> The standard Dockerfile should be adopted to add the Datadog Java Instrumentation library
@@ -334,12 +311,13 @@ Container Startup Script:
   |  - several config parameters to connect to dd-agent on another container
   |  - XX:...
   |  - D....
-  |  
+  |  (patch 1: runn the patch 2 right after BWCE installation on a new container)
   +-+-> /tmp/tibco.home/bw*/*/bin/startBWAppNode.sh
     |   /tmp/tibco.home/bwce/2.7/bin/startBWAppNode.sh
     |	  
     +--> /tmp/tibco.home/bw*/*/bin/bwappnode
-	     /tmp/tibco.home/bwce/2.7/bin/bwappnode
+	 /tmp/tibco.home/bwce/2.7/bin/bwappnode
+	 (apply patch 2 for adding DD config parameters and adopt the JVM start for adding an instrumentaion lib)
          Line 33: startup of the JVM for BW App Node   <== here we need to add the instrumentation for Datadog
 
 Dockerfile <- building the BWCE base image        (here we add the Datadog libs to distribute it to each application)
@@ -347,10 +325,15 @@ Dockerfile <- building the BWCE base image        (here we add the Datadog libs 
 Dockerfile <- building the BWCE application image (here we configure add and configure the Datadog instrumentation library)
 -> bwce-sample-app/Dockerfile
 
+-----------------------
 What needs to patched?
- ==> /tmp/tibco.home/bwce/2.7/bin/bwappnode
- Line 33:
- 
+-----------------------
+==> /scripts/start.sh - before starting the BW node (application server)
+==> /tmp/tibco.home/bwce/2.7/bin/bwappnode - Line 33:
+
+The current patch is OPTION 2. The changes are applied at the conatiner image build time and during application container startup.
+As the patch is already applied with the bwce-base image, it cannot be reverted during the application image build.
+
 How to add the patch?
 option 1)
  - unzip bwce-runtime distribution package
@@ -360,3 +343,18 @@ option 1)
 option 2) 
  - add a patch script during base image creation
  - apply the patch on file <path>/tibco.home/bwce/2.7/bin/bwappnode during base image creation process
+
+==============
+Open aspects
+==============
+1) How to implement the change reliably? -- building it into the CI/CD pipeline
+2) How to add plugins or customer enhancements for BWCE?
+3) Image build process is sub-optimal. It leads to large images. - Docker mulit-stage builds should be used instead.
+4) Image sizes can be reduced. See article: [BWCE base Image Optimization](https://docs.google.com/document/d/1aYuDovGxnnS4-8QHEP1Pq4-gU1FDWPg0dM1UYpP3_lQ/edit#heading=h.dzca8hjvwurj) and public: [BWCE Base Image Optimization](https://docs.google.com/document/d/1V9pkGbfo335drvImmXIYaMqdheqhuIPqwPXhTkbDh8Y/edit)
+5) For faster container startup the installation of main components should happen during container image creation, not during container startup. - See TIBCO github repo for samples: [Scripts for customizing Docker images for TIBCO BusinessWorks™ Container Edition](https://github.com/TIBCOSoftware/bwce-docker/tree/openjdk-alpine)
+
+----------------------
+Other considerations:
+----------------------
+Which classes and metrics are the relevant ones for BWCE? - Hard to tell! It's better to use the TIBCO BWCE provided OpenTelemtry exporter to send those TIBCO selected metrics to Datadog, see [OpenTelemetry and OpenTracing](https://docs.datadoghq.com/tracing/trace_collection/open_standards/).
+
