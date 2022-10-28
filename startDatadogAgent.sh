@@ -2,12 +2,13 @@
 source ./dd-agent.conf
 
 # check if we have a stoped dd-agent container
-if [ $(docker container ls --filter "status=exited" --filter "ancestor=gcr.io/datadoghq/agent:7" | wc -l) > 1  ]
+if [[ $(docker container ls --filter "status=exited" --filter "ancestor=gcr.io/datadoghq/agent:7" | wc -l) > 1 ]]
 then
   echo "[INFO] Removing stoppped dd-agent container"
   docker rm dd-agent
 fi
-
+echo "DONE"
+exit 1
 # starting dd-agent container on localhost docker
 # agent on docker container gets read only access to
 # - docker demon:         -v /var/run/docker.sock:/var/run/docker.sock:ro
