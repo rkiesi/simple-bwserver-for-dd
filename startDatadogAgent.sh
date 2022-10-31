@@ -7,8 +7,7 @@ then
   echo "[INFO] Removing stoppped dd-agent container"
   docker rm dd-agent
 fi
-echo "DONE"
-exit 1
+
 # starting dd-agent container on localhost docker
 # agent on docker container gets read only access to
 # - docker demon:         -v /var/run/docker.sock:/var/run/docker.sock:ro
