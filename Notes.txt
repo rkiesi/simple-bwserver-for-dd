@@ -297,7 +297,15 @@ Application Image
 	The installer script should also run as part of the image creation to save limit the size of the resulting container image and improve startup time (only JVM must initalize)
 
  docker build -t simple-bwserver-demo:latest .
- docker run --rm -ti -p 8088:8088/tcp --name bwservice simple-bwserver-demo:latest
+ 
+ docker run --rm -ti \
+  -p 8088:8088/tcp \
+  -e APP_NAME_ON_DD=simple-bwserver-demo \
+  -e APP_VERSION_ON_DD=1.1.a \
+  -e APP_ENV_ON_DD=pre-prod-test \
+  -e DD_AGENT_URL="http://192.168.49.1:8126" \
+  --name bwservice \
+  simple-bwserver-demo:latest
  
 -----------------------------------------------------
 Enhancing the BW Application Image for DD Monitoring
