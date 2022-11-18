@@ -13,7 +13,13 @@ TIBCO BWCE Monitoring unsing Datadog Cloud Services
    --> Dashboards - should show metrics collected by dd-agent running on Docker container within virtual server
        show data for all running containers (dd-agent, flogo-webui, registry)
 	   [similar: Infrastructure -> Containers]
-	   
+
+# Datadog Documentation: 
+# [Send Metrics from OpenTelemetry to Datadog](https://docs.datadoghq.com/metrics/open_telemetry/#overview)
+# [Enabling OTLP Ingestion on the Datadog Agent](https://docs.datadoghq.com/tracing/trace_collection/open_standards/otlp_ingest_in_the_agent/?tab=docker#enabling-otlp-ingestion-on-the-datadog-agent)
+#For gPRC: Set DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT to 0.0.0.0:4317 and expose port 4317.
+#For HTTP: Set DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT to 0.0.0.0:4318 and expose port 4318.
+
 Commands:
 ---------
 docker run -d \
@@ -28,6 +34,8 @@ docker run -d \
  -e DD_SITE="datadoghq.eu" \
  -e DD_LOGS_ENABLED=true \
  -e DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true \
+ -e DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT=0.0.0.0:4317 \
+ -e DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT=0.0.0.0:4318 \
  gcr.io/datadoghq/agent:7
 
 OR
@@ -298,15 +306,77 @@ Application Image
 
  docker build -t simple-bwserver-demo:latest .
  
+ # container 1 of 2 parall instances
  docker run --rm -ti \
   -p 8088:8088/tcp \
   -e APP_NAME_ON_DD=simple-bwserver-demo \
   -e APP_VERSION_ON_DD=1.1.a \
   -e APP_ENV_ON_DD=pre-prod-test \
   -e DD_AGENT_URL="http://192.168.49.1:8126" \
-  --name bwservice \
+  --name bwservice1 \
   simple-bwserver-demo:latest
- 
+  
+ # container 2 of 2 parall instances
+ docker run --rm -ti \
+  -p 8088:8088/tcp \
+  -e APP_NAME_ON_DD=simple-bwserver-demo2 \
+  -e APP_VERSION_ON_DD=1.1.b \
+  -e APP_ENV_ON_DD=pre-prod-test \
+  -e DD_AGENT_URL="http://192.168.49.1:8126" \
+  --name bwservice2 \
+  simple-bwserver-demo:latest
+
+# ---
+# Variation for sending BW engine OpenTelemetry spans to DD Agent
+# (not configuring dd-lib but enabling BW built-in OpenTelemttry exporter)
+# --- 
+# doc links:
+# > Configuring Opentelemetry: https://docs.tibco.com/pub/bwce/2.7.3/doc/html/Default.htm#bwce-app-monitoring/configuring-opentelemetry.htm
+# > Environment Variables for Docker: https://docs.tibco.com/pub/bwce/2.7.3/doc/html/Default.htm#app-dev-guide/environment-variable.htm
+# ---
+# first testing against Jaeger all in one tracing backend:
+# article: [Jaeger Tracing: A Friendly Guide for Beginners](https://medium.com/jaegertracing/jaeger-tracing-a-friendly-guide-for-beginners-7b53a4a568ca)
+
+# telemtry target: Jager all-in-one
+docker run --rm -ti \
+  -p 8088:8088/tcp \
+  -e BW_ENGINE_THREADCOUNT=12 \
+  -e BW_LOGLEVEL=INFO \
+  -e BW_JAVA_OPTS="-Dbw.engine.opentelemetry.enable=true -Dbw.engine.opentelemetry.span.exporter.endpoint=http://192.168.49.1:6831" \
+  --name bwservice-ot \
+  simple-bwserver-demo:latest
+
+# Datadog Documentation: 
+# [Send Metrics from OpenTelemetry to Datadog](https://docs.datadoghq.com/metrics/open_telemetry/#overview)
+# [Enabling OTLP Ingestion on the Datadog Agent](https://docs.datadoghq.com/tracing/trace_collection/open_standards/otlp_ingest_in_the_agent/?tab=docker#enabling-otlp-ingestion-on-the-datadog-agent)
+#For gPRC: Set DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT to 0.0.0.0:4317 and expose port 4317.
+#For HTTP: Set DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT to 0.0.0.0:4318 and expose port 4318.
+
+# telemtry target: DD Agent
+docker run --rm -ti \
+  -p 8088:8088/tcp \
+  -e BW_ENGINE_THREADCOUNT=8 \
+  -e BW_LOGLEVEL=WARN \
+  -e BW_JAVA_OPTS="-Dbw.engine.opentelemetry.enable=true -Dbw.engine.opentelemetry.span.exporter.endpoint=http://192.168.49.1:4317" \
+  -e APP_NAME_ON_DD=simple-bwserver-demo3 \
+  -e APP_VERSION_ON_DD=1.1.b \
+  -e APP_ENV_ON_DD=pre-prod-test \
+  -e DD_AGENT_URL="http://192.168.49.111:8126" \
+  -e OTEL_EXPORTER_OTLP_ENDPOINT="http://192.168.49.1:4318" \
+  --name bwservice-ot \
+  simple-bwserver-demo:latest
+
+# -----
+# Option to use Datadog OpemTelemetry Collector instead of DD Agent
+# -----
+# Run the OpenTelemetry Collector
+docker run -d --name opentelemetry-collector \
+    -p 4317:4317/tcp \
+    -p 4317:4318/tcp \
+    -v $(pwd)/collector.yaml:/etc/otelcol-contrib/config.yaml \
+    otel/opentelemetry-collector-contrib
+
+
 -----------------------------------------------------
 Enhancing the BW Application Image for DD Monitoring
 -----------------------------------------------------
