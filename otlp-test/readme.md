@@ -116,3 +116,65 @@ docker run --rm -ti \
 ```
 
 Now, open the URL *http://<your-host>:16686* with you browser to follow the metrics and spans sent by our BWCE application.
+
+
+## Using TIBCO provided BWCE Monitoring Application **BWCEMon**
+
+The above ways to monitor the behaviour of an BWCE application are not able to provide insiht on the business integration application inner workings. The TIBCO provided BWCE monitoring application is better suited to show execatly the needed KPIs for a BusinessWorks application.
+For Setup of BWCEMon please follow the documentation for your environment:
+* [TIBCO BusinessWorks Container Edition Application Monitoring and Troubleshooting](https://docs.tibco.com/pub/bwce/2.8.0/doc/pdf/TIB_bwce_2.8.0_application_monitoring_troubleshooting.pdf) - Application Monitoring on Docker
+* [TIBCO BusinessWorks Container Edition Application Monitoring and Troubleshooting](https://docs.tibco.com/pub/bwce/2.8.0/doc/pdf/TIB_bwce_2.8.0_application_monitoring_troubleshooting.pdf) - Setting Up BWCE Application Monitoring on Kubernetes
+
+A list of measures available for BWCEMon and via OpenTelemtry is available at [OpenTelemetry Tags From Palettes](https://docs.tibco.com/pub/bwce/2.8.0/doc/html/Default.htm#bwce-app-monitoring/opentracing-tags-fro.htm).
+
+### Configuring needed MySQL Database
+
+BWCEMon requires a supported relational database server to be present as the monitoring application will save all collected metrics data for BWCE applications connecting to it. For a local test we are using MySQL as a local server, depolyed side by side with the local docker runtime.
+
+```
+$ mysql -u root -p
+
+mysql> CREATE USER 'bwcemon'@'%' IDENTIFIED WITH mysql_native_password BY 'passw0rd';
+mysql> CREATE DATABASE IF NOT EXISTS bwcemon CHARACTER SET utf8mb4;
+
+mysql> GRANT ALL PRIVILEGES ON bwcemon.* TO 'bwcemon'@'%' WITH GRANT OPTION;
+
+# Check:
+# - reason: node.js mqsldb module is not yet capable of using the newer MySQL authentication method!
+# - listed plugin must be mysql_native_password!
+
+mysql> SELECT user,authentication_string,plugin,host FROM mysql.user;
++------------------+------------------------------------------------------------------------+-----------------------+-----------+
+| user             | authentication_string                                                  | plugin                | host      |
++------------------+------------------------------------------------------------------------+-----------------------+-----------+
+| bwcemon          | *74B1C21ACE0C2D6B0678A5E503D2A60E8F9651A3                              | mysql_native_password | %         |
+```
+
+### Running BWCEMon as Container
+
+```
+docker run --rm \
+ -p 8080:8080 \
+ -p 443:443 \
+ -e PERSISTENCE_TYPE="mysql" \
+ -e DB_URL="mysql://bwcemon:passw0rd@192.168.49.1:3306/bwcemon" \
+ -e "BW_APP_MON_REGISTER_ATTEMPTS=5" \
+ -e "BW_APP_MON_REGISTER_DELAY=3000" \
+ -e HTTPS=true \
+ --name bwcemon\
+ tibc/bwcemon:2.8.0
+```
+
+### Starting a BWCE Application with Monitoring by BWCEMon
+
+Starting an BWCE application container with **BWCEMon supervision**:
+```
+docker run --rm -ti \
+  -p 8088:8088/tcp \
+  -e BW_ENGINE_THREADCOUNT=4 \
+  -e BW_LOGLEVEL=INFO \
+  -e BW_JAVA_OPTS="-Dbw.frwk.event.subscriber.instrumention.enabled=true" \
+  -e BW_APP_MONITORING_CONFIG='{"url":"http://192.168.49.1:8080"}' \
+  --name bwservice-mon \
+  simple-bwserver-demo:latest
+```
