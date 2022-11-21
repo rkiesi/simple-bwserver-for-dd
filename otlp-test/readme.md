@@ -12,7 +12,7 @@ If needed, more details on the OTLP exporter configuration can be found at [Open
 
 ## Testing what is issued via OTLP from a BWCE application
 
-OTLP metric data can be transferred eiter via gRPC or HTTP protocol.
+[OTLP](https://opentelemetry.io/docs/reference/specification/protocol/) metric data can be transferred eiter via gRPC or HTTP protocol.
 
 A first test showed that a [Jaeger](https://www.jaegertracing.io/docs/1.6/getting-started/) server will iunderstand metrics issued by a BWCE engine. Details on how to instrument a simple application for OpenTelemtry and setup and test a Jaeger server can be found as a nice article on Medium: [Jaeger Tracing: A Friendly Guide for Beginners](https://medium.com/jaegertracing/jaeger-tracing-a-friendly-guide-for-beginners-7b53a4a568ca).
 
@@ -41,7 +41,7 @@ docker run --rm -ti \
 OK, the results logged for the OTLP requests prove our assumption that HTTP transport was used is wrong. Instead the BW engine uses the gRPC protocol via HTTP/s. Log entry `"PRI * HTTP/2.0" 505 - code 505, message Invalid HTTP version (2.0)`.
 Now we know for sure **gRPC** must be enabled on DD-Agent!
 
-## Setup DD-Agent for OLTP
+## Setup DD-Agent for OTLP
 
 Following is a sample on how to start the DD-Agent container to enable OpenTelemtry support on DataDog. To enable OTLP the DD-Agent is expecting variables to set `DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT` and/or `DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT=0.0.0.0:4318`. Both ports must be exposed by the container.
 
@@ -93,7 +93,7 @@ docker run --rm -ti \
 
 ## What about OLTP with Jaeger?
 
-Starting an all-in-one Jager server - essentially following [Introducing native support for OpenTelemetry in Jaeger](https://medium.com/jaegertracing/introducing-native-support-for-opentelemetry-in-jaeger-eb661be8183c) as the BWCE engine also got native OLTP support:
+Starting an all-in-one Jager server - essentially following [Introducing native support for OpenTelemetry in Jaeger](https://medium.com/jaegertracing/introducing-native-support-for-opentelemetry-in-jaeger-eb661be8183c) as the BWCE engine also got native OTLP support:
 ```
 docker run -d --rm \
   --name jaeger \
@@ -104,7 +104,7 @@ docker run -d --rm \
   jaegertracing/all-in-one:latest
 ```
 
-Starting an BWCE application container with **Jaeger all-in-one server** as OLTP target:
+Starting an BWCE application container with **Jaeger all-in-one server** as OpenTelemetry target:
 ```
 docker run --rm -ti \
   -p 8088:8088/tcp \
