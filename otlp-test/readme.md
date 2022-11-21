@@ -116,3 +116,13 @@ docker run --rm -ti \
 ```
 
 Now, open the URL *http://<your-host>:16686* with you browser to follow the metrics and spans sent by our BWCE application.
+
+
+## Using TIBCO provided BWCE Monitoring Application **BWCEMon**
+
+The above ways to monitor the behaviour of an BWCE application are not able to provide insiht on the business integration application inner workings. The TIBCO provided BWCE monitoring application is better suited to show execatly the needed KPIs for a BusinessWorks application.
+For Setup of BWCEMon please follow the documentation for your environment:
+* [TIBCO BusinessWorks Container Edition Application Monitoring and Troubleshooting](https://docs.tibco.com/pub/bwce/2.8.0/doc/pdf/TIB_bwce_2.8.0_application_monitoring_troubleshooting.pdf) - Application Monitoring on Docker
+* [TIBCO BusinessWorks Container Edition Application Monitoring and Troubleshooting](https://docs.tibco.com/pub/bwce/2.8.0/doc/pdf/TIB_bwce_2.8.0_application_monitoring_troubleshooting.pdf) - Setting Up BWCE Application Monitoring on Kubernetes
+
+A list of measures available for BWCEMon and via OpenTelemtry is available at [OpenTelemetry Tags From Palettes](https://docs.tibco.com/pub/bwce/2.8.0/doc/html/Default.htm#bwce-app-monitoring/opentracing-tags-fro.htm).
