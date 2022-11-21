@@ -22,6 +22,7 @@ fi
 #  [Enabling OTLP Ingestion on the Datadog Agent](https://docs.datadoghq.com/tracing/trace_collection/open_standards/otlp_ingest_in_the_agent/?tab=docker#enabling-otlp-ingestion-on-the-datadog-agent)
 #  For gPRC: Set DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT to 0.0.0.0:4317 and expose port 4317.
 #  For HTTP: Set DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT to 0.0.0.0:4318 and expose port 4318.
+
 echo "[INFO] Starting a new dd-agent container"
 docker run -d \
  --name dd-agent \
