@@ -16,10 +16,13 @@ fi
 # - app metrics realy:    -p 8126:8126/tcp
 # dd-agent is starting to report to DD cloud servers on metrics for the local server,
 # docker infrastructure and any app connected to it.
-# OTLP dd-agent must be configured to expose OTLP endpoints - docs say:
-# [Enabling OTLP Ingestion on the Datadog Agent](https://docs.datadoghq.com/tracing/trace_collection/open_standards/otlp_ingest_in_the_agent/?tab=docker#enabling-otlp-ingestion-on-the-datadog-agent)
-#  for gPRC: Set DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT to 0.0.0.0:4317 and expose port 4317.
-#  for HTTP: Set DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT to 0.0.0.0:4318 and expose port 4318.
+#
+# Datadog Documentation on OpenTelemtry (OLTP): 
+#  [Send Metrics from OpenTelemetry to Datadog](https://docs.datadoghq.com/metrics/open_telemetry/#overview)
+#  [Enabling OTLP Ingestion on the Datadog Agent](https://docs.datadoghq.com/tracing/trace_collection/open_standards/otlp_ingest_in_the_agent/?tab=docker#enabling-otlp-ingestion-on-the-datadog-agent)
+#  For gPRC: Set DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT to 0.0.0.0:4317 and expose port 4317.
+#  For HTTP: Set DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT to 0.0.0.0:4318 and expose port 4318.
+
 echo "[INFO] Starting a new dd-agent container"
 docker run -d \
  --name dd-agent \
