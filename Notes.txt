@@ -304,6 +304,7 @@ Application Image
     Another option would be to add all plugins into the base image. During building the application image a Docker multi-stage build should be used to keep only the needed ones for the resulting application image.
 	The installer script should also run as part of the image creation to save limit the size of the resulting container image and improve startup time (only JVM must initalize)
 
+3a) Instantiating two Containers with different paramters for the application version shown on Datdaog
  docker build -t simple-bwserver-demo:latest .
  
  # container 1 of 2 parall instances
@@ -325,6 +326,34 @@ Application Image
   -e DD_AGENT_URL="http://192.168.49.1:8126" \
   --name bwservice2 \
   simple-bwserver-demo:latest
+
+3b) How to pass application paramters to a BWCE application running as container?
+
+Essentially BWCE supports serveral ways on how to pass paramters to an application. From its past BWCE running on VMs using BW AppNodes, paramter files named *BW profiles* where used. Those parameter files are packaged with an application EAR file. At application startup the execution environment (BW app node) gets the information which one to chose and grab the values for the environment from.
+
+In the conatiner world that approach is often not wanted by an container orchestration solution like Kubernetes or OpenShift. Those systems usually use environment variables to set expected parameters for a container instance before it is started. The application can then pickup the environment variables to receive the parameters. That way, the K8s integrated configuration management and/or secrets manager can be leveraged for the application configuration.
+
+How must a BWCE application be configured to support the environemnt variable approach? -> Each application should be created with two profiles, one for local testing and another one for telling the app to read certain environment variables. The parameters that point to environment variables must reference the variable name with starting and trailing '#', like "#APP_EMPLOYEE_NAME#'.
+
+ # sample bwce container application using profiles and environment variables
+ # The application profile should reference the paramter with value "#APP_PARAM_HELLO_NAME#" to let the BW engine read it from the environment.
+ docker run --rm -ti \
+  -p 8088:8088/tcp \
+  -e APP_NAME_ON_DD=simple-bwserver-demo2 \
+  -e APP_VERSION_ON_DD=1.1.b \
+  -e APP_ENV_ON_DD=pre-prod-test \
+  -e DD_AGENT_URL="http://192.168.49.1:8126" \
+  -e BW_PROFILE="docker" \
+  -e APP_PARAM_HELLO_NAME="Rene" \
+  --name bwservice \
+  simple-bwserver-demo:latest
+
+ATTENTION:
+The application description (Kuberntes: manifest file or Helm chart), must make sure those values are properly propagetd.
+Another option would be to set those environment variables duricng container startup. That could be a startup script that initializes the environment before its executing the actual application - in our context starts the BW app node and executes the integration flow. Potentially also the startup container Kubernetes pattern might be used.
+
+A last option is to use the built-in BW v6.7+ or BWCE 2.7+ capabilities to integrate with selected configuration management and secret manager services (Consul, AWS Secrets Manager to name a few).
+
 
 # ---
 # Variation for sending BW engine OpenTelemetry spans to DD Agent
