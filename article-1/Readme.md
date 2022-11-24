@@ -1,12 +1,12 @@
-This is my article for publishing on [Medium.com](https://medium.com):
+This is a draft version of my article for publishing on [Medium.com](https://medium.com):
 
 # How can I monitor my integration application? - The question behind the question!
 
-*Profiling and Tracing*, *Monitoring and Alerting* as well as *Exception Tracking* or *Tracing* of individual calls on their way through a bunch of microservices (mesh) are becoming more important then ever if a company decideds to move all IT resources to the cloud. What das *Cloud* mean in that context can be quite different. Often its a synonym for a virtual private cloud environment hosted at one of the hyper scalers like AWS, Azure, GCP or infrastructure providers like Linode, Hetzner to just name a view. In other context the strategy behind a move to cloud initiative is much broader. Often enterprises do have a need to support a range of different infrastructure or cloud service providers. And that's the tricky part, as one cannot rely on any pre-built monitoring, alerting and tracing features provided by an individual vendor. Therefore specialized providers emerged to solve the problem with another cloud SaaS offering.
+*Profiling and Tracing*, *Monitoring and Alerting* as well as *Exception Tracking* or *Tracing* of individual calls on their way through a bunch of microservices (in a mesh) are becoming more important then ever if a company decideds to move all IT resources to the cloud. What *Cloud* means in that context can be quite different. Often its a synonym for a virtual private cloud ([VPC](https://en.wikipedia.org/wiki/Virtual_private_cloud)) hosted at one of the hyper scalers like AWS, Azure, GCP or infrastructure providers like Linode, Hetzner to just name a view. In other context the strategy behind a move to cloud initiative is much broader. Often enterprises do have a need to support a range of different infrastructure or cloud service providers. And that's the tricky part, as one cannot rely on any pre-built monitoring, alerting and tracing features provided by an individual vendor. Therefore specialized providers emerged to solve the problem with another cloud SaaS offering.
 
 Recently the developers of a customer approached us with the question how to enable applications running on our specialized integration application server for supervision of such a cloud monitoring provider. More specific, the question was how to add a library provided by their cloud monitoring vendor to include the integration services into the same centralized monitoring infrastructure. The expectation of the DevOps seemed to be that adding the library would already solve their monitoring problem. Here is where I started to explore things.
 
-I'm working for [Cloud Software Group](https://www.cloud.com/), a newly formed software vendor integrating [TIBCO](https://www.tibco.com/) and [Citrix](https://www.citrix.com/). Therefore, the integration server in question here is [TIBCO BusinessWorks Container Edition](https://www.tibco.com/resources/datasheet/tibco-businessworks-container-edition). But the story and considerations also apply to other solutions in the integration space as well.
+  <u>*Full disclosure:*</u> *I'm working for [Cloud Software Group](https://www.cloud.com/), a newly formed software vendor integrating [TIBCO](https://www.tibco.com/) and [Citrix](https://www.citrix.com/) as sales engineer. The integration server in question here is [TIBCO BusinessWorks Container Edition](https://www.tibco.com/resources/datasheet/tibco-businessworks-container-edition). But the story and considerations do apply to other solutions in the integration space as well.*
 
 ## What is Monitoring?
 
@@ -46,13 +46,19 @@ Why is all that important? Because, we need to tweak the startup of our JVM proc
 
 Docker containers are the way applications are packed and run today. Often container orchestration system like [Kubernetes](https://kubernetes.io/) are used. As applications are already *packaged* as containers either by a vendor or as result of a CI/CD pipeline adding an instrumentation requires a change of the packaging process in a way that the resulting application container image includes the required additional instrumenation code and its parametrization.
 
-If the creator of the container image has not considered instrumentation, the creation process needs to be adopted. That was the case for us with [TIBCO BusinessWorks Container Edition v2.7.x](). There is a [descibed BWCE build process]() which is considering custom enhancements of an integration application by adding additional BusinessWorks plugins or custom code as additional JARs, but adding an instrumentation agent like the one provided by Datadog was not considered. For details see the Datadog docs [Tracing Java Applications](https://docs.datadoghq.com/tracing/trace_collection/dd_libraries/java/?tab=containers).  
+If the creator of the container image has not considered instrumentation, the creation process needs to be adopted. That was the case for us with [TIBCO BusinessWorks Container Edition v2.7.x](). There is a [descibed BWCE build process]() which is considering custom enhancements of an integration application by adding additional BusinessWorks plugins or custom code as additional JARs, but adding an instrumentation agent like the one provided by Datadog was not considered. For details see the Datadog docs [Tracing Java Applications](https://docs.datadoghq.com/tracing/trace_collection/dd_libraries/java/?tab=containers).
 
-*Hint:* The details on how to adopt the application server in question - [TIBCO BusinessWorks Container Edition](https://docs.tibco.com/products/tibco-activematrix-businessworks) - please refer to the sample provided as a patch on [Github](https://github.com/rkiesi/simple-bwserver-for-dd).
+![BWCE integration application container image build](../pictures/DD-BWCE-Integration-BuildTime.png)
+
+*The details on how to adopt the application server in question - [TIBCO BusinessWorks Container Edition](https://docs.tibco.com/products/tibco-activematrix-businessworks) - please refer to the sample provided as a patch available at [Github Repo: Simple BW Service with Datadog integration](https://github.com/rkiesi/simple-bwserver-for-dd).*
+
+![BWCE integration application under supervision of Datadog](../pictures/DD-BWCE-Integration-Runtime.png)
+
+Overall environemnt for a BWCE integartion application on Kubernetes. 
 
 ### OMG, we get so many details!
 
-Now that we have adopted our container application build process to consider a 3rd party instrumentation we can start our application. Our customer likes to use the Datadog cloud-based system monitoring and application performance monitoring. So we now can start the stuff and see what we get. Out of the box that approach seemed to be far to detailed. As the instrumentation was not told what parts (classes) of the application will produce relavant KPIs it was instrumenting each and every loaded class for profiling. That produced to many unessesary details.
+Now that we have adopted our container application build process to consider a 3rd party instrumentation we can start our application. Our customer likes to use the Datadog cloud-based system monitoring and application performance monitoring. So we now can start the stuff and see what we get. Out of the box that approach seemed to be far to detailed. As the instrumentation was not told what parts (classes) of the application will produce relavant KPIs it was instrumenting each and every loaded class for profiling. That produced to many unessesary details!
 
 ![Application Profile Flame Graph](../pictures/DD-Demo_BWCE-Sample-App_Profiling.png)
 
