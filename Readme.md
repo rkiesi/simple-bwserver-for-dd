@@ -212,7 +212,7 @@ Calling the BW application (REST service) to create some metrics for Datadog:
 curl -i http://localhost:8088/hello
 ```
 
-## How to enable OpenTelemtry support for DataDog
+## Enabling OpenTelemetry on BWCE Applications and DataDog
 
 As OpenTelemtry support is already built into BWCE support for OLTP only needs to be enabled on BW engine level. The Datadog Agent also comes with OLTP support. Therefore its just a matter of starting the container application accordingly.
 

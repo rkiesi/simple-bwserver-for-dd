@@ -2,7 +2,7 @@
 
 # Do you have an Observability Strategy for your Integration Applications?
 
-*OR - How can we monitor our BWCE integration applications?*
+*Or: How can we observe those BWCE applications on with our central cloud monitoring?*
 
 *Profiling and Tracing*, *Monitoring and Alerting* as well as *Exception Tracking* or *Tracing* of individual calls on their way through a bunch of microservices (in a mesh) are becoming more important than ever if a company decided to move all IT resources to the cloud. What *Cloud* means in that context can be quite different. Often it's a synonym for a virtual private cloud ([VPC](https://en.wikipedia.org/wiki/Virtual_private_cloud)) hosted at one of the hyper scalers like AWS, Azure, GCP or infrastructure providers like Linode, Hetzner to just name a view. In other context the strategy behind a move to cloud initiative is much broader. Often enterprises do have a need to support a range of different infrastructure or cloud service providers. And that's the tricky part, as one cannot rely on any pre-built monitoring, alerting and tracing features provided by an individual vendor. Therefore, specialized providers emerged to solve the problem with another cloud SaaS offering.
 
@@ -72,7 +72,7 @@ We need a way to restrict the instrumentation process to only getting relevant a
 
 In the last years OpenTelemetry evolved a common standard in the field of distributed tracing as a successor of several other projects. The initiative standardizes metrics formats and representations. Many tools have now built in support for ingesting and using those metrics data. TIBCO also built [OpenTelemtry](https://opentelemetry.io/) (OTLP) support into its application server engine BWCE. TIBCO BWCE is packaged and delivered with the OTLP Java libraries. The BWCE engine and TIBCO provided BW plugin code is already instrumented for emitting meaningful application metrics - [TIBCO BusinessWorks Container Edition 2.8.0 - OpenTelemetry](https://docs.tibco.com/pub/bwce/2.8.0/doc/html/Default.htm#bwce-app-monitoring/opentracing.htm) and BWCE pre-defined tags supported: [OpenTelemetry Tags From Palettes](https://docs.tibco.com/pub/bwce/2.8.0/doc/html/Default.htm#bwce-app-monitoring/opentracing-tags-fro.htm).
 
-![Application OTLP Spans](../pictures/DD-Demo_JavaApplication_OTLP.png)
+![TIBCO BWCE Application OTLP Spans](../pictures/DD-Demo_JavaApplication_OTLP.png)
 
 Tracing service calls via cloud monitoring solution using OTLP metrics give a much more precise picture on what is relevant and going on within the simple REST service test application.
 
