@@ -2,7 +2,7 @@
 
 # Do you have an Observability Strategy for your Integration Applications?
 
-*OR* - How can I monitor my integration application?
+*OR - How can we monitor our BWCE integration applications?*
 
 *Profiling and Tracing*, *Monitoring and Alerting* as well as *Exception Tracking* or *Tracing* of individual calls on their way through a bunch of microservices (in a mesh) are becoming more important than ever if a company decided to move all IT resources to the cloud. What *Cloud* means in that context can be quite different. Often it's a synonym for a virtual private cloud ([VPC](https://en.wikipedia.org/wiki/Virtual_private_cloud)) hosted at one of the hyper scalers like AWS, Azure, GCP or infrastructure providers like Linode, Hetzner to just name a view. In other context the strategy behind a move to cloud initiative is much broader. Often enterprises do have a need to support a range of different infrastructure or cloud service providers. And that's the tricky part, as one cannot rely on any pre-built monitoring, alerting and tracing features provided by an individual vendor. Therefore, specialized providers emerged to solve the problem with another cloud SaaS offering.
 
@@ -93,6 +93,9 @@ TIBCO BWCE is a special edition of TIBCO BusinessWorks v6 which enables BW for t
 
 Most often a combination of infrastructure monitoring and more specific application performance monitoring (APM) are the elements needed. As a systems engineer don't just jump on the requirement and start solving it with what looks like a quick solution. Instead, it is important to ask the *question behind the question* to understand why a feature or requirement was raised. Then ask yourself "Is it the right thing?". As the investigation and tests above showed, often there will several options and different personas might have different needs. Revealing requirements of all involved personas will provide the full picture. By investing a bit more time to understand the requirements a better solution could be designed. So, it was worth to ask the question behind the (technical) requirement. That is the responsibility of the IT architect.
 
+## Outlook
+
+Enterprise IT nowadays often relies on constainer orchestration systems like Kubernetes. Therefore it is planned to show in another article how observability would be implemneted for Kubernets. This will be a joined effort together with a systems integrator as a *working sample from the field* &rarr; [placeholder link to follow on article]()
 
 ## Bibliography
 
