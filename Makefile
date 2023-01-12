@@ -1,3 +1,4 @@
+.PHONY: clean, run
 # simple test for DD integration with straight foreward automation
 sampleApps = BasicHttpServerExample.java BasicHttpServerExample2.java
 appName = dd-java-http-server
