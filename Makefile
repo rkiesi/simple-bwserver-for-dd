@@ -37,7 +37,7 @@ run: docker_image.txt
 	 --name $(appName) $(appName):$(appVersion)
 
 clean:
-	-rm -rf *.class docker_image.txt ./com
+	-rm -rf *.class docker_image.txt ./com ./target
 	-docker kill $(appName)
 	-docker rm $(appName)
 	-docker rmi $(appName):$(appVersion)

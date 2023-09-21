@@ -1,4 +1,5 @@
 com/logicbig/example/*
+target
 *.class
 *.jar
 docker_image.txt
