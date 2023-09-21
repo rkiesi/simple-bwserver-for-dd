@@ -12,15 +12,21 @@ public class BasicHttpServerExample2 {
 
     public static void main(String[] args) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(8500), 0);
+
+        // register path and procedure to handle requests
         HttpContext context = server.createContext("/example");
         context.setHandler(BasicHttpServerExample2::handleRequest);
+
         server.start();
     }
 
+    // handle (GET) requests
     private static void handleRequest(HttpExchange exchange) throws IOException {
         URI requestURI = exchange.getRequestURI();
         UUID callid = UUID.randomUUID();
+
         printRequestInfo(exchange);
+
         String response = "This is the response at " + requestURI + " - " + callid;
         exchange.sendResponseHeaders(200, response.getBytes().length);
         OutputStream os = exchange.getResponseBody();
@@ -28,6 +34,7 @@ public class BasicHttpServerExample2 {
         os.close();
     }
 
+    // print details about HTTP request
     private static void printRequestInfo(HttpExchange exchange) {
         System.out.println("\n======================================");
         System.out.println("-- headers --");

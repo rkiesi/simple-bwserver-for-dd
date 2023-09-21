@@ -138,20 +138,23 @@ Two enhancements were made to tweak the BWCE images:
 
 The BWCE startup script call sequence is:
 ```
+Two patch elements are added: (1) running the patch script and (2) actual patch for adding the instrumentation library.
+BWCE is running a bunch of BW AppNode preparation scripts before running the JVM. These scripts don't include options for adding an intrsumentation library (special positional JVM parameter). The patch is adding those in a way that will work for future BWCE releases as well.
+
 /scripts/start.sh
 --+-> /scripts/setup.sh   <=== copy all BW node files, unpack configs and substvar files etc.
   |  - must be enhanced for dd-intstrumentation
   |  - several config parameters to connect to dd-agent on another container
   |  - XX:...
   |  - D....
-  |  (patch 1: runn the patch 2 right after BWCE installation on a new container)
+  |  (patch 1: running patch 2 right after BWCE container start and BW applicatio initialization)
   |
   +-+-> /tmp/tibco.home/bw*/*/bin/startBWAppNode.sh
     |   /tmp/tibco.home/bwce/2.7/bin/startBWAppNode.sh
     |	  
     +--> /tmp/tibco.home/bw*/*/bin/bwappnode
 	 /tmp/tibco.home/bwce/2.7/bin/bwappnode
-	 (apply patch 2 for adding DD config parameters and adopt the JVM start for adding an instrumentaion lib)
+	 (patch 2: is adding DD config parameters and adopts JVM start by adding an instrumentaion library)
          Line 33: startup of the JVM for BW App Node   <== here we need to add the instrumentation for Datadog
 ```
 
